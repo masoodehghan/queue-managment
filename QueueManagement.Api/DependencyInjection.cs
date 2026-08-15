@@ -6,26 +6,36 @@ namespace QueueManagement.Api;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddApi(this IServiceCollection services)
+    public static IServiceCollection AddApi(this IServiceCollection services, IConfiguration configuration)
     {
-        
         services.AddEndpointsApiExplorer();
-
-        services.AddSwaggerGen(c =>
+        
+        services.AddSwaggerGen(options =>
         {
-            c.SwaggerDoc("v1", new OpenApiInfo { Title = "My API", Version = "v1" });
-    
-            // Add JWT Authentication
-            c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+            options.SwaggerDoc("v1", new OpenApiInfo
             {
-                Description = "",
-                Name = "Authorization",
-                In = ParameterLocation.Header,
-                Type = SecuritySchemeType.ApiKey,
-                Scheme = "Bearer"
+                Title = "My API",
+                Version = "v1"
             });
+            
+            options.AddSecurityDefinition(
+                "identity-password",
+                new OpenApiSecurityScheme
+                {
+                    Type = SecuritySchemeType.OAuth2,
 
-            c.AddSecurityRequirement(new OpenApiSecurityRequirement()
+                    Flows = new OpenApiOAuthFlows
+                    {
+                        Password = new OpenApiOAuthFlow
+                        {
+                            TokenUrl = new Uri(configuration["SwaggerSettings:TokenUrl"]),
+
+                            Scopes = new Dictionary<string, string>()
+                        }
+                    }
+                });
+
+            options.AddSecurityRequirement(new OpenApiSecurityRequirement
             {
                 {
                     new OpenApiSecurityScheme
@@ -33,22 +43,18 @@ public static class DependencyInjection
                         Reference = new OpenApiReference
                         {
                             Type = ReferenceType.SecurityScheme,
-                            Id = "Bearer"
-                        },
-                        Scheme = "oauth2",
-                        Name = "Bearer",
-                        In = ParameterLocation.Header,
+                            Id = "identity-password"
+                        }
                     },
-                    new List<string>()
+                    Array.Empty<string>()
                 }
             });
         });
-        
+
         services.AddControllers(options => { options.Filters.Add<ValidationFilter>(); });
 
         services.Configure<ApiBehaviorOptions>(options => { options.SuppressModelStateInvalidFilter = true; });
 
         return services;
     }
-
 }

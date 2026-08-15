@@ -46,6 +46,54 @@ public class AuthController(UserManager<ApplicationUser> userManager, IConfigura
 
         return Ok(new AuthResponseDto(token, user.Id, user.Email!, user.FullName));
     }
+    
+    [HttpPost("token")]
+    [Consumes("application/x-www-form-urlencoded")]
+    public async Task<IActionResult> Token()
+    {
+        var form = await Request.ReadFormAsync();
+
+        var username = form["username"].ToString();
+        var password = form["password"].ToString();
+
+        if (string.IsNullOrWhiteSpace(username) ||
+            string.IsNullOrWhiteSpace(password))
+        {
+            return Unauthorized(new
+            {
+                error = "invalid_grant"
+            });
+        }
+
+        var user = await userManager.FindByEmailAsync(username);
+
+        if (user == null)
+        {
+            return Unauthorized(new
+            {
+                error = "invalid_grant"
+            });
+        }
+        
+        if (!await userManager.CheckPasswordAsync(
+                user,
+                password))
+        {
+            return Unauthorized(new
+            {
+                error = "invalid_grant"
+            });
+        }
+
+        var accessToken = await GenerateToken(user);
+
+        return Ok(new
+        {
+            access_token = accessToken,
+            token_type = "Bearer",
+            expires_in =  8 * 60
+        });
+    }
 
     private async Task<string> GenerateToken(ApplicationUser user)
     {

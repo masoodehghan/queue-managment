@@ -12,7 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 try
 {
     builder.Services
-        .AddApi()
+        .AddApi(builder.Configuration)
         .AddInfrastructure(builder.Configuration)
         .AddApplication();
 
@@ -23,7 +23,13 @@ try
     if (app.Environment.IsDevelopment())
     {
         app.UseSwagger();
-        app.UseSwaggerUI();
+        app.UseSwaggerUI(c =>
+        {
+            c.SwaggerEndpoint("/swagger/v1/swagger.json", "My API V1");
+            c.OAuthClientId("swagger");
+            c.OAuthAppName("Swagger UI");
+            c.OAuthUsePkce();
+        });
     }
 
     app.UseHttpsRedirection();
