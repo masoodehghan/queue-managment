@@ -23,10 +23,24 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 10.0.x
 
-      - name: Restore
+      - name: Restore solution
+        run: dotnet restore QueueManagement.sln
+
+      - name: Restore tests
         run: dotnet restore QueueManagement.Tests/QueueManagement.Tests.csproj
 
-      - name: Test
-        run: dotnet test QueueManagement.Tests/QueueManagement.Tests.csproj --configuration Release --no-restore --verbosity normal
+      - name: Build solution
+        run: dotnet build QueueManagement.sln --configuration Release --no-restore
+
+      - name: Build tests
+        run: dotnet build QueueManagement.Tests/QueueManagement.Tests.csproj --configuration Release --no-restore
+
+      - name: Run tests
+        run: >
+          dotnet test QueueManagement.Tests/QueueManagement.Tests.csproj
+          --configuration Release
+          --no-build
+          --collect:"XPlat Code Coverage"
+          --verbosity normal

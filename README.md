@@ -1,40 +1,49 @@
 # Queue Management API
 
 [![Tests](https://github.com/masoodehghan/queue-managment/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/masoodehghan/queue-managment/actions/workflows/tests.yml)
-![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)
+![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)
 
-A queue-management REST API built with ASP.NET Core and .NET 8. It supports JWT-based authentication, queue ownership, joining queues, processing queue items in order, completing items, and estimating a user's waiting time.
+A queue-management REST API built with **ASP.NET Core 10** and **.NET 10 LTS**.
+
+The API provides JWT authentication, queue ownership, FIFO queue processing, queue membership, position tracking, estimated waiting times, SQL Server persistence, validation, structured logging, automated tests, and GitHub Actions CI.
 
 ## Features
 
-- Register and log in with JWT authentication
-- Create, list, update, and close queues
-- Join an active queue
-- List and update queue items
-- Cancel/remove a queue item
+- User registration and login with JWT authentication
+- Create, update, list, and close queues
+- Join active queues
+- Prevent duplicate active queue membership
+- FIFO queue processing
 - Process the next waiting item
 - Complete the current in-progress item
-- Automatically reorder waiting items after completion/removal
-- View queue status, position, people ahead, and estimated waiting time
-- View status across all queues the current user has joined
-- Swagger/OpenAPI support in Development
+- Prevent multiple simultaneous in-progress items
+- Update or cancel queue items with authorization checks
+- Automatic queue-position reordering
+- View queue position and people ahead
+- Estimated waiting-time calculation
+- View the current user's status across active queues
 - SQL Server persistence with Entity Framework Core
-- FluentValidation request validation
-- Serilog console and file logging
+- ASP.NET Core Identity
+- Built-in ASP.NET Core OpenAPI support
+- FluentValidation
+- RFC 7807 `ProblemDetails` error responses
+- Serilog request and application logging
+- xUnit v3 tests
+- GitHub Actions CI with code coverage
 
 ## Tech Stack
 
-- .NET 8
-- ASP.NET Core Web API
-- Entity Framework Core 8
+- .NET 10
+- ASP.NET Core 10
+- Entity Framework Core 10
 - SQL Server
 - ASP.NET Core Identity
 - JWT Bearer authentication
 - FluentValidation
-- Swagger / Swashbuckle
+- ASP.NET Core OpenAPI
 - Serilog
-- xUnit for tests
-- GitHub Actions for CI
+- xUnit v3
+- GitHub Actions
 
 ## Project Structure
 
@@ -42,46 +51,107 @@ A queue-management REST API built with ASP.NET Core and .NET 8. It supports JWT-
 queue-managment/
 ├── QueueManagement.Api/
 │   ├── Controllers/
+│   ├── ErrorHandling/
+│   ├── Extensions/
 │   ├── Filters/
-│   ├── Middleware/
 │   ├── DependencyInjection.cs
 │   └── Program.cs
 ├── QueueManagement.Application/
 │   ├── Common/
+│   │   ├── Exceptions/
+│   │   └── Interfaces/
 │   ├── DTOs/
 │   ├── Services/
-│   └── Validators/
+│   ├── Validators/
+│   └── DependencyInjection.cs
 ├── QueueManagement.Domain/
 │   └── Entities/
 ├── QueueManagement.Infrastructure/
+│   ├── Authentication/
 │   ├── Data/
 │   ├── Migrations/
 │   └── DependencyInjection.cs
 ├── QueueManagement.Tests/
-├── .github/workflows/tests.yml
+├── .github/
+│   └── workflows/
+│       └── tests.yml
+├── Directory.Build.props
+├── Directory.Packages.props
+├── global.json
 └── QueueManagement.sln
 ```
 
 ## Architecture
 
-The solution is separated into four projects:
+The solution is organized into four main projects.
 
-- **QueueManagement.Api** — HTTP endpoints, middleware, Swagger, and API configuration.
-- **QueueManagement.Application** — queue use cases, DTOs, validation, interfaces, and application exceptions.
-- **QueueManagement.Domain** — queue, queue-item, and user domain entities.
-- **QueueManagement.Infrastructure** — EF Core `AppDbContext`, SQL Server, Identity, JWT configuration, migrations, and logging.
+### QueueManagement.Domain
 
-## Prerequisites
+Contains the core domain entities and enums.
+
+Examples:
+
+- `ApplicationUser`
+- `Queue`
+- `QueueItem`
+- `QueueStatus`
+- `QueueItemStatus`
+
+### QueueManagement.Application
+
+Contains application logic and abstractions.
+
+Responsibilities include:
+
+- Queue use cases
+- DTOs
+- Validation
+- Application exceptions
+- Service interfaces
+- Database abstraction through `IApplicationDbContext`
+
+### QueueManagement.Infrastructure
+
+Contains infrastructure implementations.
+
+Responsibilities include:
+
+- Entity Framework Core
+- SQL Server
+- `AppDbContext`
+- ASP.NET Core Identity persistence
+- JWT token generation
+- Database migrations
+
+### QueueManagement.Api
+
+Contains the ASP.NET Core HTTP layer.
+
+Responsibilities include:
+
+- Controllers
+- Authentication and authorization
+- OpenAPI
+- Request validation
+- Exception handling
+- `ProblemDetails`
+- Application startup
+- Serilog configuration
+
+## Requirements
 
 Install:
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - SQL Server, SQL Server Express, or LocalDB
-- EF Core CLI tools if you want to apply migrations from the command line:
+
+Verify the SDK:
 
 ```bash
-dotnet tool install --global dotnet-ef
+dotnet --version
 ```
+
+The repository includes a `global.json` file so the project uses the intended .NET 10 SDK.
 
 ## Getting Started
 
@@ -92,15 +162,22 @@ git clone https://github.com/masoodehghan/queue-managment.git
 cd queue-managment
 ```
 
-Restore packages:
+Restore dependencies:
 
 ```bash
-dotnet restore
+dotnet restore QueueManagement.sln
+dotnet restore QueueManagement.Tests/QueueManagement.Tests.csproj
 ```
 
-### Configure the database
+## Configuration
 
-The repository currently defaults to SQL Server LocalDB. You can override the connection string without modifying committed configuration:
+### Database
+
+The default configuration uses SQL Server LocalDB.
+
+You can override the connection string with an environment variable.
+
+Linux/macOS:
 
 ```bash
 export ConnectionStrings__DefaultConnection="Server=localhost;Database=QueueManagementDb;User Id=sa;Password=YOUR_PASSWORD;TrustServerCertificate=True"
@@ -112,39 +189,39 @@ PowerShell:
 $env:ConnectionStrings__DefaultConnection="Server=localhost;Database=QueueManagementDb;User Id=sa;Password=YOUR_PASSWORD;TrustServerCertificate=True"
 ```
 
-If you are on Windows and already have LocalDB installed, the connection string in `QueueManagement.Api/appsettings.json` can be used as-is.
+### JWT
 
-### Configure JWT
+The JWT signing key is intentionally not stored in source control.
 
-For local development, override the JWT signing key instead of relying on a key committed in configuration:
+For local development, use .NET user secrets:
 
 ```bash
-export Jwt__Key="replace-this-with-a-long-random-development-secret"
+dotnet user-secrets set "Jwt:Key" "replace-with-a-random-secret-at-least-32-bytes-long" --project QueueManagement.Api
+```
+
+Or use an environment variable:
+
+```bash
+export Jwt__Key="replace-with-a-random-secret-at-least-32-bytes-long"
 ```
 
 PowerShell:
 
 ```powershell
-$env:Jwt__Key="replace-this-with-a-long-random-development-secret"
+$env:Jwt__Key="replace-with-a-random-secret-at-least-32-bytes-long"
 ```
 
-For production, keep signing keys and database credentials in a secret manager or environment variables.
+Production secrets should be stored in your deployment platform's secret manager.
 
-### Configure Swagger authentication
+## Database Migrations
 
-The repository currently contains a placeholder Swagger token URL. When running locally on port `5000`, set it to the API token endpoint:
+Install the EF Core CLI tool if needed:
 
 ```bash
-export SwaggerSettings__TokenUrl="http://localhost:5000/api/auth/token"
+dotnet tool install --global dotnet-ef
 ```
 
-PowerShell:
-
-```powershell
-$env:SwaggerSettings__TokenUrl="http://localhost:5000/api/auth/token"
-```
-
-### Apply migrations
+Apply migrations:
 
 ```bash
 dotnet ef database update \
@@ -152,16 +229,16 @@ dotnet ef database update \
   --startup-project QueueManagement.Api
 ```
 
-### Run the API
+## Run the API
 
 ```bash
-dotnet run --project QueueManagement.Api --urls http://localhost:5000
+dotnet run --project QueueManagement.Api
 ```
 
-In Development, Swagger is available at:
+In Development, the OpenAPI document is available at:
 
 ```text
-http://localhost:5000/swagger
+/openapi/v1.json
 ```
 
 ## Authentication
@@ -175,10 +252,12 @@ POST /api/auth/register
 Content-Type: application/json
 ```
 
+Example:
+
 ```json
 {
   "email": "user@example.com",
-  "password": "YourStrongPassword123!",
+  "password": "StrongPassword123!",
   "fullName": "Example User"
 }
 ```
@@ -190,83 +269,105 @@ POST /api/auth/login
 Content-Type: application/json
 ```
 
+Example:
+
 ```json
 {
   "email": "user@example.com",
-  "password": "YourStrongPassword123!"
+  "password": "StrongPassword123!"
 }
 ```
 
-A successful login returns a JWT token. Send it to protected endpoints:
+A successful response returns a JWT.
+
+Use it on protected endpoints:
 
 ```http
 Authorization: Bearer YOUR_TOKEN
 ```
 
-The API also exposes `POST /api/auth/token` using `application/x-www-form-urlencoded`, which is used by the configured Swagger OAuth password flow.
+The API also provides:
+
+```http
+POST /api/auth/token
+```
+
+This endpoint accepts `application/x-www-form-urlencoded` credentials.
 
 ## API Endpoints
 
 ### Authentication
 
-| Method | Endpoint | Description | Auth |
+| Method | Endpoint | Description | Authentication |
 |---|---|---|---|
-| `POST` | `/api/auth/register` | Register a user and receive a JWT | No |
+| `POST` | `/api/auth/register` | Register a new user | No |
 | `POST` | `/api/auth/login` | Log in and receive a JWT | No |
-| `POST` | `/api/auth/token` | Form-based token endpoint for Swagger/OAuth flow | No |
+| `POST` | `/api/auth/token` | Form-based token endpoint | No |
 
 ### Queues
 
 | Method | Endpoint | Description |
 |---|---|---|
 | `POST` | `/api/queues` | Create a queue |
-| `GET` | `/api/queues` | List queues owned by the current user |
-| `GET` | `/api/queues/{id}` | Get a queue |
+| `GET` | `/api/queues` | Get queues owned by the current user |
+| `GET` | `/api/queues/{id}` | Get a queue by ID |
 | `PUT` | `/api/queues/{id}` | Update a queue |
 | `DELETE` | `/api/queues/{id}` | Close a queue |
-| `GET` | `/api/queues/{id}/status` | Get queue status and the current user's position |
+| `GET` | `/api/queues/{id}/status` | Get queue and current-user status |
 
-All queue endpoints require authentication. Updating, deleting, processing, and completing queue work is restricted by service rules to the queue owner where applicable.
+All queue endpoints require authentication.
 
 ### Queue Items
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/queues/{queueId}/items` | Join/add an item to a queue |
+| `POST` | `/api/queues/{queueId}/items` | Join a queue |
 | `GET` | `/api/queues/{queueId}/items` | List active queue items |
-| `PUT` | `/api/queues/{queueId}/items/{itemId}` | Update an item's name |
-| `DELETE` | `/api/queues/{queueId}/items/{itemId}` | Cancel/remove an item |
-| `POST` | `/api/queues/{queueId}/items/process-next` | Move the first waiting item to `InProgress` |
-| `POST` | `/api/queues/{queueId}/items/complete-current` | Complete the current in-progress item |
+| `PUT` | `/api/queues/{queueId}/items/{itemId}` | Update a queue item |
+| `DELETE` | `/api/queues/{queueId}/items/{itemId}` | Cancel a queue item |
+| `POST` | `/api/queues/{queueId}/items/process-next` | Process the next waiting item |
+| `POST` | `/api/queues/{queueId}/items/complete-current` | Complete the current item |
 
 ### Current User Queue Status
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/my-queues/status` | Return status for queues the current user is waiting in or being processed in |
+| `GET` | `/api/my-queues/status` | Get the current user's status across active queues |
 
-## Queue Flow
+## Queue Rules
 
-A typical queue lifecycle is:
+A queue item can have one of these states:
 
 ```text
-User joins queue
-      │
-      ▼
-   Waiting
-      │
-      │ owner calls process-next
-      ▼
- InProgress
-      │
-      │ owner calls complete-current
-      ▼
-  Completed
+Waiting
+   │
+   │ process-next
+   ▼
+InProgress
+   │
+   │ complete-current
+   ▼
+Completed
 ```
 
-Removing an item marks it as cancelled. Completing or cancelling an item causes the remaining waiting items to be reordered.
+An item can also become:
 
-## Example
+```text
+Cancelled
+```
+
+The API enforces the following rules:
+
+- Only active queues accept new items.
+- A user can have only one active item in the same queue.
+- Queue processing follows FIFO order.
+- Only the queue owner can process or complete queue items.
+- Only the item owner or queue owner can update or cancel an active item.
+- A queue can have only one `InProgress` item at a time.
+- Completing or cancelling an item reorders the remaining waiting items.
+- Closing a queue cancels its remaining active items.
+
+## Example Requests
 
 Create a queue:
 
@@ -281,7 +382,7 @@ curl -X POST http://localhost:5000/api/queues \
   }'
 ```
 
-Join the queue:
+Join a queue:
 
 ```bash
 curl -X POST http://localhost:5000/api/queues/1/items \
@@ -292,14 +393,14 @@ curl -X POST http://localhost:5000/api/queues/1/items \
   }'
 ```
 
-Check your status:
+Check queue status:
 
 ```bash
 curl http://localhost:5000/api/queues/1/status \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
-Process the next item as the queue owner:
+Process the next item:
 
 ```bash
 curl -X POST http://localhost:5000/api/queues/1/items/process-next \
@@ -313,45 +414,119 @@ curl -X POST http://localhost:5000/api/queues/1/items/complete-current \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
+## Error Responses
+
+The API uses RFC 7807-style `ProblemDetails`.
+
+Example:
+
+```json
+{
+  "type": "about:blank",
+  "title": "Resource not found",
+  "status": 404,
+  "detail": "Queue 100 was not found.",
+  "instance": "/api/queues/100",
+  "traceId": "..."
+}
+```
+
+Typical status codes include:
+
+- `400 Bad Request`
+- `401 Unauthorized`
+- `403 Forbidden`
+- `404 Not Found`
+- `409 Conflict`
+- `500 Internal Server Error`
+
 ## Tests
 
-The included `QueueManagement.Tests` project uses xUnit and EF Core's in-memory provider to test the queue service without requiring SQL Server.
+The test project uses:
 
-The tests cover:
+- xUnit v3
+- EF Core InMemory
+- Microsoft.NET.Test.Sdk
+- Coverlet
 
-- Appending a new item at the correct position
-- Estimated waiting-time calculation
-- Processing the first waiting item
-- Preventing non-owners from processing a queue
-- Completing an in-progress item
-- Reordering waiting items after completion
-- Returning the current user's position and people-ahead count
-
-Run the tests locally:
+Run all tests:
 
 ```bash
 dotnet test QueueManagement.Tests/QueueManagement.Tests.csproj
 ```
 
-## GitHub Actions Test Badge
+The test suite covers important queue behavior including:
 
-The workflow at `.github/workflows/tests.yml` runs on pushes and pull requests targeting `main`.
+- queue insertion
+- estimated waiting times
+- duplicate membership prevention
+- FIFO processing
+- queue-owner authorization
+- queue-item authorization
+- prevention of multiple in-progress items
+- queue cancellation/reordering
+- queue completion/reordering
+- queue status and user position calculation
 
-The badge at the top of this README is:
+## Continuous Integration
+
+GitHub Actions runs the test workflow for pushes and pull requests targeting `main`.
+
+Workflow:
+
+```text
+.github/workflows/tests.yml
+```
+
+The workflow performs:
+
+```text
+Restore
+   ↓
+Build
+   ↓
+Test
+   ↓
+Code Coverage
+```
+
+The badge at the top of this README reflects the latest workflow result:
 
 ```markdown
 [![Tests](https://github.com/masoodehghan/queue-managment/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/masoodehghan/queue-managment/actions/workflows/tests.yml)
 ```
 
-After you add the workflow and test project to the repository and push to GitHub, the badge will automatically show the latest workflow status.
+## Package Management
 
-## Security Notes
+NuGet package versions are centralized in:
 
-- Do not use committed development JWT keys in production.
-- Store production signing keys and database credentials outside source control.
+```text
+Directory.Packages.props
+```
+
+Shared project settings are defined in:
+
+```text
+Directory.Build.props
+```
+
+The .NET SDK is configured through:
+
+```text
+global.json
+```
+
+## Security
+
+- Never commit JWT signing keys.
+- Store production secrets outside source control.
 - Use HTTPS in production.
-- Review authorization rules before exposing queue-item update/remove operations to untrusted clients.
+- Keep database credentials in environment variables or a secret manager.
+- Rotate secrets if they are ever exposed.
+- Keep dependencies updated with supported .NET 10 package versions.
 
 ## License
 
-No license file is currently included in this repository. Add a `LICENSE` file if you want to define how others may use, modify, or distribute the project.
+No license file is currently included.
+
+Add a `LICENSE` file if you want to define how others may use, modify, or distribute the project.

@@ -1,122 +1,105 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
+using QueueManagement.Application.Common.Interfaces;
 using QueueManagement.Application.DTOs.Auth;
 using QueueManagement.Domain.Entities.Users;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
 
 namespace QueueManagement.Api.Controllers;
 
-[Route("api/[controller]")]
 [ApiController]
-public class AuthController(UserManager<ApplicationUser> userManager, IConfiguration configuration)
-    : ControllerBase
+[Route("api/auth")]
+public sealed class AuthController(
+    UserManager<ApplicationUser> userManager,
+    IJwtTokenService jwtTokenService) : ControllerBase
 {
     [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] RegisterDto dto)
+    public async Task<ActionResult<AuthResponseDto>> Register(
+        RegisterDto dto)
     {
         var user = new ApplicationUser
         {
-            UserName = dto.Email,
-            Email = dto.Email,
-            FullName = dto.FullName
+            Email = dto.Email.Trim(),
+            UserName = dto.Email.Trim(),
+            FullName = dto.FullName.Trim()
         };
 
         var result = await userManager.CreateAsync(user, dto.Password);
 
         if (!result.Succeeded)
-            return BadRequest(result.Errors);
+        {
+            AddIdentityErrors(result);
+            return ValidationProblem(ModelState);
+        }
 
-        var token = await GenerateToken(user);
-
-        return Ok(new AuthResponseDto(token, user.Id, user.Email!, user.FullName));
+        return Ok(CreateAuthResponse(user));
     }
 
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginDto dto)
+    public async Task<ActionResult<AuthResponseDto>> Login(
+        LoginDto dto)
     {
-        var user = await userManager.FindByEmailAsync(dto.Email);
-        
-        if (user == null || !await userManager.CheckPasswordAsync(user, dto.Password))
-            return Unauthorized("Invalid credentials");
+        var user = await userManager.FindByEmailAsync(dto.Email.Trim());
 
-        var token = await GenerateToken(user);
+        if (user is null ||
+            !await userManager.CheckPasswordAsync(user, dto.Password))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "Invalid credentials",
+                detail: "The email address or password is incorrect.");
+        }
 
-        return Ok(new AuthResponseDto(token, user.Id, user.Email!, user.FullName));
+        return Ok(CreateAuthResponse(user));
     }
-    
+
     [HttpPost("token")]
     [Consumes("application/x-www-form-urlencoded")]
-    public async Task<IActionResult> Token()
+    public async Task<IActionResult> Token(
+        [FromForm(Name = "username")] string username,
+        [FromForm(Name = "password")] string password)
     {
-        var form = await Request.ReadFormAsync();
-
-        var username = form["username"].ToString();
-        var password = form["password"].ToString();
-
         if (string.IsNullOrWhiteSpace(username) ||
             string.IsNullOrWhiteSpace(password))
         {
             return Unauthorized(new
             {
-                error = "invalid_grant"
+                error = "invalid_grant",
+                error_description = "Username and password are required."
             });
         }
 
-        var user = await userManager.FindByEmailAsync(username);
+        var user = await userManager.FindByEmailAsync(username.Trim());
 
-        if (user == null)
+        if (user is null ||
+            !await userManager.CheckPasswordAsync(user, password))
         {
             return Unauthorized(new
             {
-                error = "invalid_grant"
+                error = "invalid_grant",
+                error_description = "The username or password is incorrect."
             });
         }
-        
-        if (!await userManager.CheckPasswordAsync(
-                user,
-                password))
-        {
-            return Unauthorized(new
-            {
-                error = "invalid_grant"
-            });
-        }
-
-        var accessToken = await GenerateToken(user);
 
         return Ok(new
         {
-            access_token = accessToken,
+            access_token = jwtTokenService.CreateToken(user),
             token_type = "Bearer",
-            expires_in =  8 * 60
+            expires_in = jwtTokenService.ExpirationSeconds
         });
     }
 
-    private async Task<string> GenerateToken(ApplicationUser user)
+    private AuthResponseDto CreateAuthResponse(ApplicationUser user) =>
+        new(
+            jwtTokenService.CreateToken(user),
+            user.Id,
+            user.Email ?? string.Empty,
+            user.FullName);
+
+    private void AddIdentityErrors(IdentityResult result)
     {
-        var claims = new List<Claim>
+        foreach (var error in result.Errors)
         {
-            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new(ClaimTypes.Email, user.Email!),
-            new(ClaimTypes.Name, user.FullName)
-        };
-
-        var key = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(configuration["Jwt:Key"]!));
-        
-        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-        var token = new JwtSecurityToken(
-            issuer: configuration["Jwt:Issuer"],
-            audience: configuration["Jwt:Audience"],
-            claims: claims,
-            expires: DateTime.UtcNow.AddDays(7),
-            signingCredentials: credentials
-        );
-
-        return new JwtSecurityTokenHandler().WriteToken(token);
+            ModelState.AddModelError(error.Code, error.Description);
+        }
     }
 }

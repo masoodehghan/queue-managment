@@ -1,15 +1,19 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using QueueManagement.Application.Common.Interfaces;
 using QueueManagement.Domain.Entities.Queues;
 using QueueManagement.Domain.Entities.Users;
+using QueueEntity = QueueManagement.Domain.Entities.Queues.Queue;
 
 namespace QueueManagement.Infrastructure.Data;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options)
-    : IdentityDbContext<ApplicationUser, IdentityRole<int>, int>(options)
+public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
+    : IdentityDbContext<ApplicationUser, IdentityRole<int>, int>(options),
+      IApplicationDbContext
 {
-    public DbSet<Queue> Queues => Set<Queue>();
+    public DbSet<QueueEntity> Queues => Set<QueueEntity>();
+
     public DbSet<QueueItem> QueueItems => Set<QueueItem>();
 
     protected override void OnModelCreating(ModelBuilder builder)

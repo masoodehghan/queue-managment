@@ -1,49 +1,54 @@
-using Microsoft.EntityFrameworkCore;
 using QueueManagement.Api;
-using QueueManagement.Api.Middleware;
 using QueueManagement.Application;
 using QueueManagement.Infrastructure;
-using QueueManagement.Infrastructure.Data;
 using Serilog;
 
-var builder = WebApplication.CreateBuilder(args);
-
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
 
 try
 {
+    var builder = WebApplication.CreateBuilder(args);
+
+    builder.Services.AddSerilog((services, loggerConfiguration) =>
+    {
+        loggerConfiguration
+            .ReadFrom.Configuration(builder.Configuration)
+            .ReadFrom.Services(services)
+            .Enrich.FromLogContext();
+    });
+
     builder.Services
-        .AddApi(builder.Configuration)
-        .AddInfrastructure(builder.Configuration)
-        .AddApplication();
+        .AddApi()
+        .AddApplication()
+        .AddInfrastructure(builder.Configuration);
 
     var app = builder.Build();
 
-    app.UseMiddleware<ExceptionMiddleware>();
+    app.UseExceptionHandler();
+    app.UseSerilogRequestLogging();
 
     if (app.Environment.IsDevelopment())
     {
-        app.UseSwagger();
-        app.UseSwaggerUI(c =>
-        {
-            c.SwaggerEndpoint("/swagger/v1/swagger.json", "My API V1");
-            c.OAuthClientId("swagger");
-            c.OAuthAppName("Swagger UI");
-            c.OAuthUsePkce();
-        });
+        app.MapOpenApi();
     }
 
     app.UseHttpsRedirection();
     app.UseAuthentication();
     app.UseAuthorization();
+
     app.MapControllers();
-    
+
     app.Run();
 }
-catch (Exception ex)
+catch (Exception exception)
 {
-    Log.Fatal(ex, "Application terminated unexpectedly");
+    Log.Fatal(exception, "Application terminated unexpectedly.");
 }
 finally
 {
     Log.CloseAndFlush();
 }
+
+public partial class Program;
